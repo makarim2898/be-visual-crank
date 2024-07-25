@@ -1,4 +1,4 @@
-from flask import Blueprint, Response, request
+from flask import Blueprint, Response, request, jsonify
 from flask_cors import CORS
 import cv2
 import os
@@ -118,9 +118,34 @@ def switch_camera():
 
 #save amera settings
 @settings.route('/settings-save', methods=['GET'])
-def save_parameter_camera():
-    value = 'sucess save'
-    return Response(value, mimetype='multipart/')
+def save_settings():
+    global zoom_level, focus_level, id_camera
+    data = {
+        'message': 'success masuk settings',
+    }
+    
+    # Mengembalikan respons JSON
+    return jsonify(data)    
+
+@settings.route('/settings-reset', methods=['GET'])
+def reset_settings():
+    global zoom_level, focus_level, id_camera
+    data = {
+        'message': 'success masuk reset settings',
+    }
+    
+    # Mengembalikan respons JSON
+    return jsonify(data)    
+
+@settings.route('/settings-save-images', methods=['GET'])
+def save_images():
+    global zoom_level, focus_level, id_camera
+    data = {
+        'message': 'success masuk save images',
+    }
+    
+    # Mengembalikan respons JSON
+    return jsonify(data)  
 
 @settings.route('/tipu', methods=['GET'])
 def tipu_index():
