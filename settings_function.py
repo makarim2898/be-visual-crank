@@ -117,7 +117,7 @@ def switch_camera():
     print(f"Camera id is set to {id_camera}")
     return Response(str(id_camera))
 
-#save amera settings
+
 @settings.route('/settings-save-images', methods=['GET'])
 def save_images():
     global zoom_level, focus_level, id_camera
@@ -131,13 +131,21 @@ def save_images():
 @settings.route('/settings-reset', methods=['GET'])
 def reset_settings():
     global zoom_level, focus_level, id_camera
+    zoom_level = 100
+    focus_level = 0
+    disable_autofocus_with_v4l2(id_camera, focus_value=focus_level)
+    setting_zoom(id_camera, zoom_level=zoom_level)
+    
+    new_params = {'zoom level' : zoom_level, 'focus level' : focus_level}
     data = {
         'message': 'success masuk reset settings',
+        'new_params': new_params,
     }
     
     # Mengembalikan respons JSON
     return jsonify(data)    
 
+##########################    SAVE DATA PARAMETER BY INDEX CAMERA    ##############################################################################
 @settings.route('/settings-save', methods=['GET'])
 def save_settings():
     global zoom_level, focus_level, id_camera
@@ -179,6 +187,8 @@ def save_settings():
     print('parameters saved')
     return jsonify(data)  
 
+
+#################################   send data parameter to client   #################################################################
 @settings.route('/settings-get', methods=['GET'])
 def get_settings():
     global zoom_level, focus_level, id_camera
