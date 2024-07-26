@@ -3,8 +3,8 @@ from flask_cors import CORS
 import cv2
 import os
 import pandas as pd
-import json
 import datetime
+import numpy as np
 
 settings = Blueprint('my_routes', __name__)
 CORS(settings)
@@ -35,6 +35,20 @@ def setting_zoom(device, zoom_level):
 def stream_video(device):
     global zoom_level, focus_level, latest_frame
     cap = cv2.VideoCapture(device)
+    
+    if not cap.isOpened():
+        # Generate a placeholder frame with error message
+        error_frame = np.zeros((500, 800, 3), np.uint8)
+        pesan_string = f'''Camera index {device} out of range
+                            Silahkan tekan Refresh Camera atau Halaman Web
+                            jika masih berlanjut Lepas pasang USB pada Camera
+                            jika masih error lambaikan tangan pada kamera'''
+        cv2.putText(error_frame, pesan_string, (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        ret, buffer = cv2.imencode('.jpg', error_frame)
+        error_frame = buffer.tobytes()
+        
+        yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
     
     # Set frame width and height for 16:9 aspect ratio and 1080p resolution
     frame_width = 3840
