@@ -4,10 +4,12 @@ import cv2
 import os
 import pandas as pd
 import json
+import datetime
 
 settings = Blueprint('my_routes', __name__)
 CORS(settings)
 
+latest_frame = None
 
 id_camera = 0
 zoom_level = 100
@@ -31,7 +33,7 @@ def setting_zoom(device, zoom_level):
     print(f"Zoom diatur ke {zoom_level}")
   
 def stream_video(device):
-    global zoom_level, focus_level
+    global zoom_level, focus_level, latest_frame
     cap = cv2.VideoCapture(device)
     
     # Set frame width and height for 16:9 aspect ratio and 1080p resolution
@@ -55,6 +57,7 @@ def stream_video(device):
         # Calculate the frame width based on the aspect ratio
         frame_width = int((frame_height / 9) * 16)
         frame = cv2.resize(frame, (int(frame_width * (810 / frame_height)), 810))
+        latest_frame = frame
         ret, buffer = cv2.imencode('.jpg', frame)
         frame = buffer.tobytes()
 
@@ -122,13 +125,31 @@ def switch_camera():
 
 @settings.route('/settings-save-images', methods=['GET'])
 def save_images():
-    global zoom_level, focus_level, id_camera
-    data = {
-        'message': 'success masuk save img',
-    }
+    global latest_frame
+    raw_name = request.args.get('name')
+    corrected_name = raw_name.replace(' ', '_')
+
+    # Get current date and time for saving the file name.
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"{corrected_name}_{timestamp}.jpg"
     
+    # Buat Direktory download
+    current_directory = os.path.dirname(os.path.abspath(__file__))
+    downloads_directory = os.path.join(current_directory, 'Downloads')
+    os.makedirs(downloads_directory, exist_ok=True)
+    
+    #simpan ke direktori download
+    image_path = os.path.join(downloads_directory, f"{file_name}.png")  # Menambahkan timestamp pada nama file
+    
+    cv2.imwrite(image_path, latest_frame)
+    print(f"Gambar disimpan di {image_path}")
+    
+    data = {
+        'message': 'sucess save images',
+        'filename': file_name,
+    }
     # Mengembalikan respons JSON
-    return jsonify(data)    
+    return jsonify(data)
 
 ##########################    reset camera params    ##############################################################################
 @settings.route('/settings-reset', methods=['GET'])
