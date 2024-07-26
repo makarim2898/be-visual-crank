@@ -64,13 +64,13 @@ def stream_video(device):
     cap.release()
     cv2.destroyAllWindows()
 
-#untuk straming frame di front end
+################################### streaming image to client   #################################################
 @settings.route('/settings-show-video', methods=['GET'])
 def settings_show_video():
     print(f'Settings show video with camera index {id_camera}')
     return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-#untuk setting focus dari front end
+################################### setting focus parameters   #################################################
 @settings.route('/settings-focus', methods=['GET'])
 def settings_focus():
     global focus_level
@@ -80,6 +80,7 @@ def settings_focus():
     print("Focus is set to " + focus)
     return Response(focus, mimetype='multipart/')
 
+################################### setting zoom  #################################################
 @settings.route('/settings-zoom', methods=['GET'])
 def zoom():
     global zoom_level
@@ -89,7 +90,7 @@ def zoom():
     print("Zoom is set to " + zoom)
     return Response(zoom, mimetype='multipart/')
 
-#buat input kamera manual
+################################### switch camera by input   #################################################
 @settings.route('/settings-camera-index', methods=['GET'])
 def set_camera():
     global id_camera
@@ -102,6 +103,7 @@ def set_camera():
     print(f"Camera id is set to {id_camera}")
     return Response(str(id_camera))
 
+################################### switch camera by index   #################################################
 @settings.route('/settings/switch-camera-index', methods=['GET'])
 def switch_camera():
     global id_camera
@@ -128,6 +130,7 @@ def save_images():
     # Mengembalikan respons JSON
     return jsonify(data)    
 
+##########################    reset camera params    ##############################################################################
 @settings.route('/settings-reset', methods=['GET'])
 def reset_settings():
     global zoom_level, focus_level, id_camera
