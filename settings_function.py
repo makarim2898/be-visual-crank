@@ -6,7 +6,7 @@ import pandas as pd
 import datetime
 import numpy as np
 
-settings = Blueprint('my_routes', __name__)
+settings = Blueprint('settings_routes', __name__)
 CORS(settings)
 
 latest_frame = None
