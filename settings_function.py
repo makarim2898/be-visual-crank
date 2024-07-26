@@ -4,6 +4,7 @@ import cv2
 import os
 import pandas as pd
 import datetime
+import time
 import numpy as np
 
 settings = Blueprint('settings_routes', __name__)
@@ -34,6 +35,7 @@ def setting_zoom(device, zoom_level):
   
 def stream_video(device):
     global zoom_level, focus_level, latest_frame
+    time.sleep(2)
     cap = cv2.VideoCapture(device)
     
     if not cap.isOpened():
