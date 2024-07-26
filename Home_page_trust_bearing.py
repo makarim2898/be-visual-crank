@@ -5,12 +5,14 @@ import os
 import pandas as pd
 import datetime
 import numpy as np
+import time
 
 home_bearing = Blueprint('bearing_routes', __name__)
 CORS(home_bearing)
 
 def stream_video(device):
     global latest_frame
+    time.sleep(2)
     cap = cv2.VideoCapture(device)
     
     if not cap.isOpened():
