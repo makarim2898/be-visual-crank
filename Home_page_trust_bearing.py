@@ -13,6 +13,7 @@ CORS(home_bearing)
 
 inspectionFlag = False
 bearing_detected = False
+latest_frame = None
 
 model = YOLO("./models/yolov8m.pt")
 def stream_video(device):
@@ -49,6 +50,19 @@ def stream_video(device):
             break
         results = model(frame, conf=0.9, classes=0)
         annotated_frame = results[0].plot()
+                    
+        # dibawah ini logika untuk memperkecil ukuran frame agar ringan saat di show up
+        #Set frame width and height for 16:9 aspect ratio and 1080p resolution
+        frame_width = 1280
+        frame_height = 720  # Initial frame height for 16:9 aspect ratio and 720p resolution
+
+        # Calculate the frame width based on the aspect ratio
+        frame_width = int((frame_height / 9) * 16)
+        annotated_frame = cv2.resize(annotated_frame, (int(frame_width * (810 / frame_height)), 810))
+        
+        #encoding gambar yang akan di kirim  menjadi jpg
+        ret, buffer = cv2.imencode('.jpg', annotated_frame)
+        frame = buffer.tobytes()
         
         #jika trigger untuk deteksi on
         if inspectionFlag:
@@ -60,26 +74,15 @@ def stream_video(device):
                     bearing_detected = True
                     save_image(annotated_frame, 'OKE', 'Deteksi_oke')
                     print(f'Detected object: {detected_object}')
+                    latest_frame = frame
                     inspectionFlag = False
                 else:
                     bearing_detected = False
                     print('No bearing object detected')
                     save_image(annotated_frame, 'NG', 'Tidak_terdeteksi')
                     print(f'Detected object: {detected_object}')
+                    latest_frame = frame
                     inspectionFlag = False
-            
-                    
-        # dibawah ini logika untuk memperkecil ukuran frame agar ringan saat di show up
-        #Set frame width and height for 16:9 aspect ratio and 1080p resolution
-        frame_width = 1280
-        frame_height = 720  # Initial frame height for 16:9 aspect ratio and 720p resolution
-
-        # Calculate the frame width based on the aspect ratio
-        frame_width = int((frame_height / 9) * 16)
-        annotated_frame = cv2.resize(annotated_frame, (int(frame_width * (810 / frame_height)), 810))
-        latest_frame = frame
-        ret, buffer = cv2.imencode('.jpg', annotated_frame)
-        frame = buffer.tobytes()
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
@@ -109,13 +112,34 @@ def save_image(images_to_save, raw_file_name, image_category):
     
     cv2.imwrite(image_path, images_to_save)
     print(f"Gambar disimpan di {image_path}")
-    
+
+def last_detection():
+    global latest_frame
+    while True:
+        if latest_frame is not None:
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + latest_frame + b'\r\n')
+        else:
+            # Generate a placeholder frame with a message if no frame is available
+            placeholder_frame = np.zeros((500, 800, 3), np.uint8)
+            message = "No frame available"
+            cv2.putText(placeholder_frame, message, (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            ret, buffer = cv2.imencode('.jpg', placeholder_frame)
+            placeholder_frame = buffer.tobytes()
+
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + placeholder_frame + b'\r\n')
+        time.sleep(0.1)  # Add a small delay to avoid high CPU usage
     
 @home_bearing.route('/bearing/show-video', methods=['GET'])
-def settings_show_video():
+def home_show_video():
     id_camera = request.args.get('id_camera', default=0, type=int)
     print(f'Settings show video with camera index {id_camera}')
     return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@home_bearing.route('/bearing/last_detections', methods=['GET'])
+def home_show_last():
+    return Response(last_detection(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @home_bearing.route('/bearing/get-data', methods=['GET'])
 def get_data():
