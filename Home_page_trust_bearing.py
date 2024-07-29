@@ -11,9 +11,18 @@ from ultralytics import YOLO
 home_bearing = Blueprint('bearing_routes', __name__)
 CORS(home_bearing)
 
+#definisi variabel global untuk flags
 inspectionFlag = False
 bearing_detected = False
+
+#definisi variabel global untuk
 latest_frame = None
+updateData = {'total_judges': 0,
+              'sesion_judges': 0,
+              'trigger_start': 0,
+              'trigger_reset':0,
+              'last_judgement': 0,
+              }
 
 model = YOLO("./models/yolov8m.pt")
 def stream_video(device):
@@ -144,7 +153,8 @@ def home_show_last():
 @home_bearing.route('/bearing/get-data', methods=['GET'])
 def get_data():
     global bearing_detected
-    data = {'bearing_detected': bearing_detected}
+    
+    # data = {'bearing_detected': bearing_detected}
     return jsonify(data)
 
 @home_bearing.route('/bearing/start', methods=['GET'])
