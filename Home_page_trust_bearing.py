@@ -26,7 +26,7 @@ updateData = {'total_judges': 0,
 
 model = YOLO("./models/yolov8m.pt")
 def stream_video(device):
-    global latest_frame, bearing_detected, inspectionFlag
+    global latest_frame, bearing_detected, inspectionFlag, updateData
     time.sleep(2)
     cap = cv2.VideoCapture(device)
     
@@ -92,6 +92,9 @@ def stream_video(device):
                     print(f'Detected object: {detected_object}')
                     latest_frame = frame
                     inspectionFlag = False
+            update_data_dict('last_judgement', bearing_detected)
+            update_data_dict('sesion_judges', updateData['sesion_judges']+1)
+            update_data_dict('total_judges', updateData['total_judges']+1)
 
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
@@ -139,6 +142,11 @@ def last_detection():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + placeholder_frame + b'\r\n')
         time.sleep(0.1)  # Add a small delay to avoid high CPU usage
+        
+def update_data_dict(key, value):
+    global updateData
+    updateData[key] = value
+    
     
 @home_bearing.route('/bearing/show-video', methods=['GET'])
 def home_show_video():
@@ -153,7 +161,8 @@ def home_show_last():
 @home_bearing.route('/bearing/get-data', methods=['GET'])
 def get_data():
     global bearing_detected
-    
+    data = updateData
+    print(data['total_judges'])
     # data = {'bearing_detected': bearing_detected}
     return jsonify(data)
 
