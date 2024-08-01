@@ -7,6 +7,7 @@ import datetime
 import numpy as np
 import time
 from ultralytics import YOLO
+import serial
 
 home_bearing = Blueprint('bearing_routes', __name__)
 CORS(home_bearing)
@@ -21,10 +22,51 @@ updateData = {'total_judges': 0,
               'sesion_judges': 0,
               'trigger_start': 0,
               'trigger_reset':0,
-              'last_judgement': 0,
+              'last_judgement': 'NG',
               }
 
 model = YOLO("./models/yolov8m.pt")
+
+############## function untuk arduino communication #########
+def init_serial_connection():
+    global arduino
+    while True:
+        print("init_serial_connection called")
+        try:
+            arduino = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)  # Initialize the Arduino port with shorter timeout
+            if arduino.isOpen():  # Check if the serial port is open
+                arduino.close()  # Close the port if it is open
+            arduino.open()  # Reopen the serial port
+            print("Connection established.")
+            break  # Exit the loop if successful
+        except serial.SerialException as e:
+            print(f"Serial connection error during initialization: {e}")
+            print("Waiting for connection...")
+            time.sleep(5)  # Wait for 5 seconds before trying again
+
+def baca_data_arduino():
+    global arduino, inspectionFlag
+    while True:
+        try:
+            input_data = arduino.readline().strip().decode('utf-8')
+            if input_data == "start_scan":
+                print(f"FROM ARDUINO: {input_data}")
+                inspectionFlag = True
+                break
+            elif input_data == "no trigger":
+                print(f"FROM ARDUINO: {input_data}")
+                inspectionFlag = False
+                break
+        except serial.SerialException:
+            print("Serial connection error. Waiting for reconnection...")
+            arduino.close()
+            init_serial_connection()  # Reinitialize the serial connection
+        except UnicodeDecodeError:
+            print("Error decoding input data.")
+    
+    
+
+############## function untuk stream frame ke client ################
 def stream_video(device):
     global latest_frame, bearing_detected, inspectionFlag, updateData
     time.sleep(2)
@@ -73,6 +115,9 @@ def stream_video(device):
         ret, buffer = cv2.imencode('.jpg', annotated_frame)
         frame = buffer.tobytes()
         
+        #read arduino data serial
+        baca_data_arduino()
+        
         #jika trigger untuk deteksi on
         if inspectionFlag:
         # logika untuk mendapatkan data object yang di deteksi
@@ -92,6 +137,7 @@ def stream_video(device):
                     print(f'Detected object: {detected_object}')
                     latest_frame = frame
                     inspectionFlag = False
+            
             update_data_dict('last_judgement', bearing_detected)
             update_data_dict('sesion_judges', updateData['sesion_judges']+1)
             update_data_dict('total_judges', updateData['total_judges']+1)
@@ -101,12 +147,15 @@ def stream_video(device):
 
     cap.release()
     cv2.destroyAllWindows()
-    
+
+
+############## Function untuk start inspection #################
 def start_inspection():
     global inspectionFlag
     inspectionFlag = True
     return 
 
+############## Function untuk save images #################
 def save_image(images_to_save, raw_file_name, image_category):
     corrected_name = raw_file_name.replace(' ', '_')
 
@@ -125,6 +174,7 @@ def save_image(images_to_save, raw_file_name, image_category):
     cv2.imwrite(image_path, images_to_save)
     print(f"Gambar disimpan di {image_path}")
 
+############## Function untuk menampilkan last detection #################
 def last_detection():
     global latest_frame
     while True:
@@ -142,15 +192,18 @@ def last_detection():
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + placeholder_frame + b'\r\n')
         time.sleep(0.1)  # Add a small delay to avoid high CPU usage
-        
+
+############## Function untuk update data #################
 def update_data_dict(key, value):
     global updateData
     updateData[key] = value
     
-    
+
+####################### END POINT ##########################
 @home_bearing.route('/bearing/show-video', methods=['GET'])
 def home_show_video():
     id_camera = request.args.get('id_camera', default=0, type=int)
+    init_serial_connection()
     print(f'Settings show video with camera index {id_camera}')
     return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
