@@ -9,12 +9,23 @@ import time
 from ultralytics import YOLO
 import serial
 
-home_bearing = Blueprint('bearing_routes', __name__)
-CORS(home_bearing)
-
+home_page = Blueprint('crank_routes', __name__)
+CORS(home_page)
+#definitions resolusi gambar input 
+width_res = 320
+height_res = 240
 #definisi variabel global untuk flags
 inspectionFlag = False
-bearing_detected = False
+
+#definisi global untuk object yang di deteksi
+oilseal_thread = 0,
+rear_thread = False
+keyway_detected = False
+
+#definisi index class object didalam model yolo
+oilseal_class_index = 0
+rear_thread_class_index = 0
+keyway_class_index = 0
 
 #definisi variabel global untuk
 latest_frame = None
@@ -27,50 +38,23 @@ updateData = {'total_judges': 0,
 
 model = YOLO("./models/yolov8m.pt")
 
-############## function untuk arduino communication #########
-def init_serial_connection():
-    global arduino
-    while True:
-        print("init_serial_connection called")
-        try:
-            arduino = serial.Serial('/dev/ttyUSB0', 115200, timeout=0.1)  # Initialize the Arduino port with shorter timeout
-            if arduino.isOpen():  # Check if the serial port is open
-                arduino.close()  # Close the port if it is open
-            arduino.open()  # Reopen the serial port
-            print("Connection established.")
-            break  # Exit the loop if successful
-        except serial.SerialException as e:
-            print(f"Serial connection error during initialization: {e}")
-            print("Waiting for connection...")
-            time.sleep(5)  # Wait for 5 seconds before trying again
-
-def baca_data_arduino():
-    global arduino, inspectionFlag
-    while True:
-        try:
-            input_data = arduino.readline().strip().decode('utf-8')
-            if input_data == "start_scan":
-                print(f"FROM ARDUINO: {input_data}")
-                inspectionFlag = True
-                break
-            elif input_data == "no trigger":
-                print(f"FROM ARDUINO: {input_data}")
-                inspectionFlag = False
-                break
-        except serial.SerialException:
-            print("Serial connection error. Waiting for reconnection...")
-            arduino.close()
-            init_serial_connection()  # Reinitialize the serial connection
-        except UnicodeDecodeError:
-            print("Error decoding input data.")
-    
-    
+############## function untuk PLC communication #########
 
 ############## function untuk stream frame ke client ################
 def stream_video(device):
-    global latest_frame, bearing_detected, inspectionFlag, updateData
+    global latest_frame, rear_thread, inspectionFlag, updateData
     time.sleep(2)
     cap = cv2.VideoCapture(device)
+    cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter.fourcc('M', 'J', 'P', 'G'))
+    # Set frame width and height for 16:9 aspect ratio and 1080p resolution
+    frame_width = width_res
+    frame_height = height_res  # Initial frame height for 16:9 aspect ratio and 720p resolution
+
+    # Calculate the frame width based on the aspect ratio
+    frame_width = int((frame_height / 9) * 16)
+    
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
     
     if not cap.isOpened():
         # Generate a placeholder frame with error message
@@ -86,26 +70,20 @@ def stream_video(device):
         yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + error_frame + b'\r\n')
     
-    # Set frame width and height for 16:9 aspect ratio and 1080p resolution
-    frame_width = 3840
-    frame_height = 2160  # Initial frame height for 16:9 aspect ratio and 720p resolution
-
-    # Calculate the frame width based on the aspect ratio
-    frame_width = int((frame_height / 9) * 16)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             print("Tidak dapat membaca frame")
             break
-        results = model(frame, conf=0.9, classes=0)
+        
+        results = model(frame, conf=0.7, classes=0)
         annotated_frame = results[0].plot()
-                    
+        
+        print(f"deteksi dengan kamera index {device}")
         # dibawah ini logika untuk memperkecil ukuran frame agar ringan saat di show up
         #Set frame width and height for 16:9 aspect ratio and 1080p resolution
-        frame_width = 1280
-        frame_height = 720  # Initial frame height for 16:9 aspect ratio and 720p resolution
+        frame_width = 640
+        frame_height = 480  # Initial frame height for 16:9 aspect ratio and 720p resolution
 
         # Calculate the frame width based on the aspect ratio
         frame_width = int((frame_height / 9) * 16)
@@ -115,30 +93,28 @@ def stream_video(device):
         ret, buffer = cv2.imencode('.jpg', annotated_frame)
         frame = buffer.tobytes()
         
-        #read arduino data serial
-        baca_data_arduino()
+        #read plc var data
+        
         
         #jika trigger untuk deteksi on
         if inspectionFlag:
         # logika untuk mendapatkan data object yang di deteksi
-        #kemudian perbarui nilai di global variabel bearing_detected
+        #kemudian perbarui nilai di global variabel rear_thread
             for r in results:
                 detected_object = len(r.boxes.cls)
                 if detected_object:
-                    bearing_detected = True
                     save_image(annotated_frame, 'OKE', 'Deteksi_oke')
                     print(f'Detected object: {detected_object}')
                     latest_frame = frame
                     inspectionFlag = False
                 else:
-                    bearing_detected = False
-                    print('No bearing object detected')
+                    print('No crank object detected')
                     save_image(annotated_frame, 'NG', 'Tidak_terdeteksi')
                     print(f'Detected object: {detected_object}')
                     latest_frame = frame
                     inspectionFlag = False
             
-            update_data_dict('last_judgement', bearing_detected)
+            update_data_dict('last_judgement', rear_thread)
             update_data_dict('sesion_judges', updateData['sesion_judges']+1)
             update_data_dict('total_judges', updateData['total_judges']+1)
 
@@ -198,28 +174,45 @@ def update_data_dict(key, value):
     global updateData
     updateData[key] = value
     
-
 ####################### END POINT ##########################
-@home_bearing.route('/bearing/show-video', methods=['GET'])
-def home_show_video():
-    id_camera = request.args.get('id_camera', default=0, type=int)
-    init_serial_connection()
+##################### end point streaming video #########################
+@home_page.route('/crank/show-video', methods=['GET'])
+def home_show_oilseal():
+    id_camera = 0
     print(f'Settings show video with camera index {id_camera}')
     return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@home_bearing.route('/bearing/last_detections', methods=['GET'])
+@home_page.route('/crank/show-video-thread', methods=['GET'])
+def home_show_thread():
+    id_camera = 4
+    print(f'Settings show video with camera index {id_camera}')
+    return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+@home_page.route('/crank/show-video-keyway', methods=['GET'])
+def home_show_keyway():
+    id_camera = 12
+    print(f'Settings show video with camera index {id_camera}')
+    return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+######################## end point last detections #########################
+@home_page.route('/crank/last-detections', methods=['GET'])
 def home_show_last():
     return Response(last_detection(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-@home_bearing.route('/bearing/get-data', methods=['GET'])
+####################### end point streaming data json ######################
+@home_page.route('/crank/get-data', methods=['GET'])
 def get_data():
-    global bearing_detected
+    global rear_thread
     data = updateData
     print(data['total_judges'])
-    # data = {'bearing_detected': bearing_detected}
+    # data = {'rear_thread': rear_thread}
     return jsonify(data)
 
-@home_bearing.route('/bearing/start', methods=['GET'])
+
+####################### end point start inspection ######################
+@home_page.route('/crank/start', methods=['GET'])
 def startInspection():
     start_inspection()
     return "sucess startingspection"
+#################################################################################################################################
