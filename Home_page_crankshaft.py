@@ -41,7 +41,7 @@ model = YOLO("./models/yolov8m.pt")
 ############## function untuk PLC communication #########
 
 ############## function untuk stream frame ke client ################
-def stream_video(device):
+def stream_video(device, class_to_predict):
     global latest_frame, rear_thread, inspectionFlag, updateData
     time.sleep(2)
     cap = cv2.VideoCapture(device)
