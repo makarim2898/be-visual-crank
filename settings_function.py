@@ -229,7 +229,7 @@ def save_settings():
 
 
 #################################   send data parameter to client   #################################################################
-@settings.route('/settings-get', methods=['GET'])
+@settings.route('/settings-get-params', methods=['GET'])
 def get_settings():
     global zoom_level, focus_level, id_camera
     df = pd.read_csv('camera_parameters.csv')
@@ -237,6 +237,34 @@ def get_settings():
     print(camera_parameters) 
     # Mengembalikan respons JSON
     return camera_parameters
+
+@settings.route('/settings-get-cfg', methods=['GET'])
+def get_settings_cfg():
+    df = pd.read_csv('idx_cam_cfg.csv')
+    camera_cfg = df.to_dict(orient='records')
+    print(camera_cfg) 
+    # Mengembalikan respons JSON
+    return camera_cfg
+
+@settings.route('/settings-camera-cfg-update', methods=['GET'])
+def update_config():
+    idx_cam_1 = request.args.get('idx_cam_1')
+    idx_cam_2 = request.args.get('idx_cam_2')
+    idx_cam_3 = request.args.get('idx_cam_3')
+    
+    data = [
+    {"camera_id": 1, "camera_index": idx_cam_1},
+    {"camera_id": 2, "camera_index": idx_cam_2},
+    {"camera_id": 3, "camera_index": idx_cam_3}
+    ]
+    
+    print(data)
+    df = pd.DataFrame(data)
+    
+    df.to_csv('idx_cam_cfg.csv', index=False)
+     
+    # Mengembalikan respons JSON
+    return data
 
 @settings.route('/tipu', methods=['GET'])
 def tipu_index():

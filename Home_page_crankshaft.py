@@ -174,25 +174,35 @@ def update_data_dict(key, value):
     global updateData
     updateData[key] = value
     
+############## function untuk loading camera index configuration #################
+def update_camera_configuration(camera_id):
+    df = pd.read_csv('idx_cam_cfg.csv')
+    data_camera = df.loc[df['camera_id'] == camera_id]
+    camera_idx  = data_camera['camera_index'].values[0]
+    return camera_idx
+    
 ####################### END POINT ##########################
 ##################### end point streaming video #########################
-@home_page.route('/crank/show-video', methods=['GET'])
+@home_page.route('/crank/show-video-oilseal', methods=['GET'])
 def home_show_oilseal():
-    id_camera = 0
-    print(f'Settings show video with camera index {id_camera}')
-    return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+    camera_id = 1
+    idx_camera = update_camera_configuration(camera_id)
+    print(f'Settings show video with camera index {idx_camera}')
+    return Response(stream_video(idx_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @home_page.route('/crank/show-video-thread', methods=['GET'])
 def home_show_thread():
-    id_camera = 4
-    print(f'Settings show video with camera index {id_camera}')
-    return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+    camera_id = 2
+    idx_camera = update_camera_configuration(camera_id)
+    print(f'Settings show video with camera index {idx_camera}')
+    return Response(stream_video(idx_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 @home_page.route('/crank/show-video-keyway', methods=['GET'])
 def home_show_keyway():
-    id_camera = 12
-    print(f'Settings show video with camera index {id_camera}')
-    return Response(stream_video(id_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
+    camera_id = 3
+    idx_camera = update_camera_configuration(camera_id)
+    print(f'Settings show video with camera index {idx_camera}')
+    return Response(stream_video(idx_camera), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 ######################## end point last detections #########################
